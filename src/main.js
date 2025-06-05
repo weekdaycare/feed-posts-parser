@@ -4,6 +4,7 @@ import * as cheerio from 'cheerio';
 import { logger, handleError, withRetry, formatDate, IssueManager, ConcurrencyPool } from './utils.js';
 import * as github from '@actions/github';
 import fs from 'fs';
+import path from 'path';
 
 const RETRY_TIMES = parseInt(core.getInput('retry_times'));
 const POSTS_COUNT = parseInt(core.getInput('posts_count'));
@@ -13,7 +14,10 @@ const CONCURRENCY_LIMIT = 10;
 
 async function parseFeed(feedUrl) {
   try {
+    logger('info', `Fetching feed from URL: ${feedUrl}`);
     const response = await axios.get(feedUrl, { timeout: 5000 });
+    logger('info', `Feed response received from ${feedUrl}, status: ${response.status}`);
+    
     const $ = cheerio.load(response.data, { xmlMode: true });
     const posts = [];
 
@@ -25,7 +29,7 @@ async function parseFeed(feedUrl) {
         isRss = true;
       }
     }
-    logger('info', `Feed URL: ${items.length} isRss: ${isRss}`);
+    logger('info', `Feed URL: ${feedUrl}, items found: ${items.length}, isRss: ${isRss}`);
 
     items.slice(0, POSTS_COUNT).each((i, el) => {
       const $item = $(el);
@@ -81,19 +85,19 @@ async function processIssue(issue) {
 
     logger('info', `Found JSON content in issue #${issue.number}, jsonMatch[0]: ${jsonMatch[0]}`);
     const jsonData = JSON.parse(jsonMatch[0]);
-    logger('info', `Got JSON content in issue #${issue.number}`, jsonData);
+    logger('info', `Parsed JSON content from issue #${issue.number}`, jsonData);
 
     // 获取 feed 数据
     const feedUrl = jsonData.feed;
     let posts = [];
     let status = 'error';
     if (feedUrl) {
-      logger('info', `Getting feed data from ${feedUrl}`);
+      logger('info', `Fetching feed data from ${feedUrl}`);
       posts = await withRetry(() => parseFeed(feedUrl), RETRY_TIMES);
       if (posts && posts.length > 0) status = 'active';
     }
 
-    logger('info', `Converted JSON content in issue #${issue.number}`, jsonData);
+    logger('info', `Processed feed data for issue #${issue.number}, posts count: ${posts.length}, status: ${status}`);
     const newBody = issue.body.replace(jsonMatch[0], JSON.stringify(jsonData, null, 2));
     return {
       data: jsonData,
@@ -119,8 +123,8 @@ async function run() {
   try {
     logger('info', `>> 开始`);
     const allIssues = await issueManager.getIssues();
+    logger('info', `Fetched all issues, total count: ${allIssues.length}`);
 
-    // 获取issue总数
     const friends_num = allIssues.length;
     const pool = new ConcurrencyPool(CONCURRENCY_LIMIT);
 
@@ -134,9 +138,12 @@ async function run() {
 
     for (const issue of allIssues) {
       await pool.add(async () => {
+        logger('info', `Processing issue #${issue.number}`);
         const result = await processIssue(issue);
         if (result) {
           active_num++;
+          logger('info', `Issue #${issue.number} processed successfully`);
+
           // 更新 issue body
           await issueManager.octokit.issues.update({
             owner,
@@ -144,7 +151,7 @@ async function run() {
             issue_number: issue.number,
             body: result.newBody
           });
-          logger('info', `Updated issue #${issue.number}`);
+          logger('info', `Updated issue body for issue #${issue.number}`);
 
           // 合并所有文章
           if (result.data && Array.isArray(result.data.posts)) {
@@ -163,13 +170,16 @@ async function run() {
           }
         } else {
           error_num++;
+          logger('warn', `Issue #${issue.number} failed to process`);
         }
       });
     }
 
+    logger('info', `All issues processed, active: ${active_num}, errors: ${error_num}, articles: ${article_num}`);
     allArticles.sort((a, b) => new Date(b.created) - new Date(a.created));
 
     last_updated_time = formatDate(new Date(), DATE_FORMAT);
+    logger('info', `Last updated time: ${last_updated_time}`);
 
     const allData = {
       statistical_data: {
@@ -182,15 +192,14 @@ async function run() {
       article_data: allArticles
     };
 
-    // 写入 json
     fs.mkdirSync(path.dirname(DATAPATH), { recursive: true });
     fs.writeFileSync(DATAPATH, JSON.stringify(allData, null, 2), 'utf8');
-    logger('info', 'all.json 写入完成');
+    logger('info', `all.json written successfully to ${DATAPATH}`);
 
     logger('info', `>> 结束`);
   } catch (error) {
-    // handleError(error, 'Error processing issues');
-    logger('error', `Error processing issues`);
+    handleError(error, 'Error processing issues');
+    logger('error', `Error processing issues: ${error.message}`);
     process.exit(1);
   }
 }
