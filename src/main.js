@@ -192,9 +192,15 @@ async function run() {
       article_data: allArticles
     };
 
-    fs.mkdirSync(path.dirname(DATAPATH), { recursive: true });
+    let dataPath = DATAPATH;
+
+    if (path.isAbsolute(dataPath)) {
+      dataPath = dataPath.replace(/^\/+/, '');
+    }
+
+    fs.mkdirSync(path.dirname(dataPath), { recursive: true });
     fs.writeFileSync(DATAPATH, JSON.stringify(allData, null, 2), 'utf8');
-    logger('info', `all.json written successfully to ${DATAPATH}`);
+    logger('info', `json written successfully to ${DATAPATH}`);
 
     logger('info', `>> 结束`);
   } catch (error) {
