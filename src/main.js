@@ -5,9 +5,10 @@ import { logger, handleError, withRetry, formatDate, IssueManager, ConcurrencyPo
 import * as github from '@actions/github';
 import fs from 'fs';
 
-const RETRY_TIMES = core.getInput('retry_times') || 3;
-const POSTS_COUNT = core.getInput('posts_count') || 2;
-const DATE_FORMAT = core.getInput('date_format') || 'YYYY-MM-DD HH:mm:ss';
+const RETRY_TIMES = parseInt(core.getInput('retry_times'));
+const POSTS_COUNT = parseInt(core.getInput('posts_count'));
+const DATAPATH = core.getInput('data_path');
+const DATE_FORMAT = core.getInput('date_format');
 const CONCURRENCY_LIMIT = 10;
 
 async function parseFeed(feedUrl) {
@@ -181,8 +182,9 @@ async function run() {
       article_data: allArticles
     };
 
-    // 写入 all.json
-    fs.writeFileSync('all.json', JSON.stringify(allData, null, 2), 'utf8');
+    // 写入 json
+    fs.mkdirSync(path.dirname(DATAPATH), { recursive: true });
+    fs.writeFileSync(DATAPATH, JSON.stringify(allData, null, 2), 'utf8');
     logger('info', 'all.json 写入完成');
 
     logger('info', `>> 结束`);

@@ -9,9 +9,9 @@ inputs:
     default: 3
     type: integer
   data_path:
-    description: '输入文件路径'
+    description: '输出文件路径'
     required: false
-    default: '/v2/data.json'
+    default: '/v2/posts.json'
   posts_count:
     description: '每个feed地址获取的文章数'
     required: false
