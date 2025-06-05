@@ -154,10 +154,10 @@ async function run() {
           logger('info', `Updated issue body for issue #${issue.number}`);
 
           // 合并所有文章
-          if (result.data && Array.isArray(result.data.posts)) {
-            const author = result.data.name || '';
-            const avatar = result.data.avatar || '';
-            result.data.posts.forEach(post => {
+          if (result.posts && Array.isArray(result.posts) && result.posts.length > 0) {
+            const author = result.data.name || result.data.title || '';
+            const avatar = result.data.icon || result.data.avatar || '';
+            result.posts.forEach(post => {
               allArticles.push({
                 title: post.title,
                 created: post.published,
@@ -166,7 +166,7 @@ async function run() {
                 avatar
               });
             });
-            article_num += result.data.posts.length;
+            article_num += result.posts.length;
           }
         } else {
           error_num++;
