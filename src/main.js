@@ -199,7 +199,7 @@ async function run() {
     }
 
     fs.mkdirSync(path.dirname(dataPath), { recursive: true });
-    fs.writeFileSync(DATAPATH, JSON.stringify(allData, null, 2), 'utf8');
+    fs.writeFileSync(dataPath, JSON.stringify(allData, null, 2), 'utf8');
     logger('info', `json written successfully to ${DATAPATH}`);
 
     logger('info', `>> 结束`);
